@@ -9,20 +9,10 @@ class TodoList {
     this.render();
   }
   removeTodo(id) {
-    fetch(todosUrl + '/' + id, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json;charset=utf-8'
-      }
-    })
-    .then(response => response.json())
-    .catch((error) => {
-      console.log(error.message);
-    })
-    .then(() => {
-      this.todos = this.todos.filter((el) => {
-        return el.id !== id;
-      });
+    this.todos = this.todos.filter((el) => {
+      return el.id !== id;
+    });
+    deleteTodo(url,id).then(() => {
       let task = document.querySelectorAll(`[data-id="${id}"]`)[0];
       task.remove();
     });
@@ -36,20 +26,9 @@ class TodoList {
   changeStatus(id) {
     let index = this.todos.findIndex((el) => el.id === id);
     this.todos[index].status = !this.todos[index].status;
-    fetch(todosUrl + '/' + id, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json;charset=utf-8'
-      },
-      body: JSON.stringify(this.todos[index])
-    })
-    .then(response => response.json())
-    .catch((error) => {
-      console.log(error.message)
-    })
-    .then(fetchedTodo => {
+    updateTodo(url,this.todos[index]).then(() => {
       let task = document.querySelectorAll(`[data-id="${id}"]`)[0];
-      if(fetchedTodo.status) {
+      if (this.todos[index].status) {
         task.classList.remove('yellow-task');
         task.classList.add('green-task');
       } else {
@@ -62,7 +41,7 @@ class TodoList {
     e.preventDefault();
     let target = e.target;
     let id = target.parentNode.dataset.id
-    if(target.className.includes('set-status')) {
+    if (target.className.includes('set-status')) {
       this.changeStatus(id);
     } else {
       this.removeTodo(id);
@@ -97,24 +76,98 @@ class Task {
 
 let list = document.getElementById('list');
 let todo1 = new TodoList(list);
+const url = 'http://localhost:3000/todos';
 
-let todosUrl = "http://localhost:3000/todos";
+window.onload = loadTodos(url).then(fetchedTodos => {
+  fetchedTodos.forEach(todo => {
+    todo1.addTodo(todo);
+  });
+    todo1.render();
+});
 
-function loadTodos() {
-  fetch(todosUrl)
-    .then(response => response.json())
-    .catch((error) => {
-      console.log(error.message);
-    })
-    .then(fetchedTodos => {
-      fetchedTodos.forEach(todo => {
-        todo1.addTodo(todo);
-      });
-      todo1.render();
-    });
+function loadTodos(url) {
+  return new Promise((resolve, reject) => {
+    let xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'json';
+    xhr.onload = function () {
+      let status = xhr.status;
+      if (status === 200) {
+        resolve(xhr.response);
+      } else {
+        reject(status);
+      }
+    };
+    xhr.onerror = () => {
+      reject("Error fetching " + url);
+    }
+    xhr.send();
+  });
+};
+
+function sendTodo(url, todo) {
+  return new Promise((resolve, reject) => {
+    let xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-type', 'application/json;charset=utf-8');
+    xhr.responseType = 'json';
+    xhr.onload = function () {
+      let status = xhr.status;
+      if (status === 200 || status == 201) {
+        resolve(xhr.response);
+      } else {
+        reject(status);
+      }
+    };
+    xhr.onerror = () => {
+      reject("Error fetching " + url);
+    }
+    xhr.send(JSON.stringify(todo));
+  });
+};
+
+function updateTodo(url, todo) {
+  return new Promise((resolve, reject) => {
+    let xhr = new XMLHttpRequest();
+    xhr.open('PUT', url + '/' + todo.id, true);
+    xhr.setRequestHeader('Content-type', 'application/json;charset=utf-8');
+    xhr.responseType = 'json';
+    xhr.onload = function () {
+      let status = xhr.status;
+      if (status === 200 || status == 201) {
+        resolve(xhr.response);
+      } else {
+        reject(status);
+      }
+    };
+    xhr.onerror = () => {
+      reject("Error fetching " + url);
+    }
+    xhr.send(JSON.stringify(todo));
+  });
 }
 
-loadTodos();
+function deleteTodo(url, id) {
+  return new Promise((resolve, reject) => {
+    let xhr = new XMLHttpRequest();
+    xhr.open('DELETE', url + '/' + id, true);
+    xhr.setRequestHeader('Content-type', 'application/json;charset=utf-8');
+    xhr.responseType = 'json';
+    xhr.onload = function () {
+      let status = xhr.status;
+      if (status === 200 || status == 201) {
+        resolve(xhr.response);
+      } else {
+        reject(status);
+      }
+    };
+    xhr.onerror = () => {
+      reject("Error fetching " + url);
+    }
+    xhr.send();
+  });
+}
+
 
 let createBtn = document.getElementById('create-btn');
 let findBtn = document.getElementById('find-btn');
@@ -123,26 +176,17 @@ let inp = document.querySelector('input');
 createBtn.addEventListener('click', (e) => {
   e.preventDefault();
   if(inp.value) {
-    fetch(todosUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json;charset=utf-8'
-      },
-      body: JSON.stringify(new Task(inp.value, false))
-    })
-      .then(response => response.json())
-      .catch((error) => {
-        console.log(error.message);
-      })
+    sendTodo(url, new Task(inp.value, false))
       .then(fetchedTodo => {
-        todo1.addTodo(fetchedTodo);
-      });
+          todo1.addTodo(fetchedTodo);
+          inp.value = '';
+        });
   }
-})
+});
 
 findBtn.addEventListener('click', (e) => {
   e.preventDefault();
   if(inp.value) {
     todo1.findTasks(inp.value);
   }
-})
+});
